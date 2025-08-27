@@ -1,0 +1,36 @@
+version: "3.9"
+
+services:
+  text_interview:
+    build:
+      context: ./text_interview
+      dockerfile: Dockerfile   # you already have this here
+    env_file:
+      - ./text_interview/.env
+    command: ["python", "-u", "main.py", "start"]  # runs the LiveKit worker HTTP app
+    expose:
+      - "8080"                 # internal port only
+    restart: unless-stopped
+
+  voice_interview:
+    build:
+      context: ./voice_interview
+      dockerfile: dockerfile   # (lowercase) you already have this here
+    env_file:
+      - ./voice_interview/.env
+    # server.py is your tiny FastAPI that Popen's agent_entry.py for each /start
+    command: ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8080"]
+    expose:
+      - "8080"
+    restart: unless-stopped
+
+  gateway:
+    image: nginx:alpine
+    depends_on:
+      - text_interview
+      - voice_interview
+    ports:
+      - "8080:80"              # public: change if you want
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    restart: unless-stopped

@@ -1,0 +1,21 @@
+version: "3.9"
+
+services:
+  interview-agent:
+    build: .
+    container_name: interview-agent
+    environment:
+      # LiveKit
+      LIVEKIT_URL: ${LIVEKIT_URL}
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET}
+      # OpenAI
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      # Supabase (server-side only)
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE: ${SUPABASE_SERVICE_ROLE}
+      # Agent config
+      AGENT_NAME: interviewer-agent
+      QUESTION_TOPIC: interview.question
+    command: ["python", "main.py", "start"]
+    restart: unless-stopped
