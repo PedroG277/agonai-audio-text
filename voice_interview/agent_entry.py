@@ -8,6 +8,7 @@ import asyncio
 import datetime
 from collections import deque
 from typing import Optional, Any, Dict, Tuple
+from supabase import create_client
 
 import httpx
 from livekit.agents import (
@@ -31,9 +32,26 @@ from livekit.plugins.openai import realtime
 REALTIME_MODEL = os.getenv("REALTIME_MODEL", "gpt-4o-mini-realtime-preview")
 DEFAULT_VOICE = os.getenv("REALTIME_VOICE", "verse")
 
+SUPABASE_URL = os.environ["SUPABASE_URL"]
+SUPABASE_KEY = os.environ["SUPABASE_SERVICE_ROLE"]
+sb = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+
+AGENT_NAME = "voice-interviewer"
+
 DEFAULT_INSTRUCTIONS = os.getenv("AGENT_INSTRUCTIONS") or (
     "Say only: 'A problem occurred. End of interview.' "
 )
+
+SYSTEM_PROMPT_TEMPLATE = """You are a corporate recruiter conducting a job interview. Use the follow script as a guidline for this interview. The questions in the script are the main questions. Do not ask follow up questions. Do not make remarks on the cadndidate's awnsers longer then one concise sentence. Once all questions of the script have been awnsered, finish the interview by stating on a dedicated message: 'End of interview'. When you enter the interview, greet the candidate with their name immediately; do not wait for the candidate to greet you first.
+
+Job title:
+{job_context}
+
+Interview script:
+{script}
+
+"""
 
 # =========================
 # Webhook (optional)
@@ -405,6 +423,21 @@ async def entrypoint(ctx: JobContext):
     payload = _read_job_payload(ctx)
     print("[/start payload]", payload)
 
+    meta = json.loads(ctx.job.metadata or "{}")
+    if meta:
+        interview = sb.table("interviews").insert({
+            "candidate_id": meta.get("candidate_id"),
+            "process_id": meta.get("process_id", 4),
+            "status": "running",
+            "room_name": ctx.room.name,
+        }).execute()
+        interview_id = interview.data[0]["id"]
+
+    sys_prompt = SYSTEM_PROMPT_TEMPLATE.format(
+        job_context=json.dumps(meta.get("job_ctx", {}), ensure_ascii=False),
+        script=json.dumps(meta.get("script", []), ensure_ascii=False),
+    )
+
     # Accept snake_case & camelCase & the exact keys you send
     candidate_id_from_body = _maybe_int(_get_first(payload, "candidate_id", "candidateId"))
     process_id_from_body   = _maybe_int(_get_first(payload, "process_id", "processId"))
@@ -477,7 +510,7 @@ async def entrypoint(ctx: JobContext):
     await room_io.start()
 
     # Determine final system instructions
-    instructions_final = (instructions_override or "").strip() or DEFAULT_INSTRUCTIONS
+    instructions_final = sys_prompt
 
     # Instantiate agent with interview context
     agent = InterviewAgent(
@@ -568,4 +601,4 @@ async def entrypoint(ctx: JobContext):
 
 
 if __name__ == "__main__":
-    cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint))
+    cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint, agent_name=AGENT_NAME, num_idle_processes=2))

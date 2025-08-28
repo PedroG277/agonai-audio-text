@@ -18,11 +18,12 @@ services:
       dockerfile: dockerfile   # (lowercase) you already have this here
     env_file:
       - ./voice_interview/.env
-    # server.py is your tiny FastAPI that Popen's agent_entry.py for each /start
-    command: ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8080"]
+    command: ["python", "-u", "agent_entry.py", "start"]
     expose:
       - "8080"
     restart: unless-stopped
+    environment:
+      - AGENT_NAME=voice-interviewer
 
   gateway:
     image: nginx:alpine

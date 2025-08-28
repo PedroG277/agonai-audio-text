@@ -22,7 +22,7 @@ LIVEKIT_API_SECRET = os.environ["LIVEKIT_API_SECRET"]
 
 OPENROUTER_API_KEY = os.environ["OPENROUTER_API_KEY"]
 OPENROUTER_BASE = os.environ.get("OPENROUTER_BASE", "https://openrouter.ai/api/v1")
-AGENT_NAME = "interviewer-agent"
+AGENT_NAME = "text-interviewer"
 LLM_MODEL = os.environ.get("LLM_MODEL", "anthropic/claude-3.7-sonnet")  # adjust as needed
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
@@ -71,6 +71,7 @@ async def entrypoint(ctx: JobContext):
         job_context=json.dumps(meta.get("job_ctx", {}), ensure_ascii=False),
         script=json.dumps(meta.get("script", []), ensure_ascii=False),
     )
+    print(sys_prompt)
     chat_ctx.add_message(role="system", content=sys_prompt)
 
     # ---- LLM (OpenAI-compatible via OpenRouter)
